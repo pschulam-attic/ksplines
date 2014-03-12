@@ -1,0 +1,6 @@
+Package: ksplines
+Title: Cluster sparse time series using splines
+Description: 
+Version: 0.1
+Author: Peter Schulam <pschulam@gmail.com>
+Maintainer: Peter Schulam <pschulam@gmail.com>

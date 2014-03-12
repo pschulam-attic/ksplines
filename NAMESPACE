@@ -1,0 +1,5 @@
+S3method(plot,ksplines)
+export(ksplines)
+import(ggplot2)
+import(plyr)
+import(splines)
