@@ -2,8 +2,6 @@
 feature_ksplines <- function(curves, k, df, order,
                              lambda = 0.1,
                              maxiter = 10,
-                             gradstep = 1.0e-2,
-                             tol = 1.0e-3,
                              normalize = FALSE) {
     
     all_x <- lapply(curves, "[[", "x")
