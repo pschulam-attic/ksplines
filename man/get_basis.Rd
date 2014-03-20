@@ -1,8 +1,8 @@
-\name{choose_basis}
-\alias{choose_basis}
+\name{get_basis}
+\alias{get_basis}
 \title{Choose an appropriate basis function for data 'x'}
 \usage{
-choose_basis(x, df, order)
+get_basis(x, df, order)
 }
 \description{
 Choose an appropriate basis function for data 'x'

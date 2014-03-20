@@ -1,5 +1,8 @@
 S3method(plot,ksplines)
+export(feature_ksplines)
 export(ksplines)
+export(sample_curves)
 import(ggplot2)
+import(orthogonalsplinebasis)
 import(plyr)
 import(splines)

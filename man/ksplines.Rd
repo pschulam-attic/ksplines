@@ -4,8 +4,8 @@
 \alias{ksplines-package}
 \title{Learn spline codebook for sparse curves}
 \usage{
-ksplines(curves, k, df, degree, intercept = TRUE, lambda = 0.1,
-  maxiter = 10)
+ksplines(curves, k, df, order, lambda = 0.1, maxiter = 10,
+  normalize = FALSE)
 }
 \description{
 Learn spline codebook for sparse curves
