@@ -2,7 +2,11 @@
 #'
 #' @export
 #' 
-ksplines <- function(curves, k, df, order, lambda = 0.1, maxiter = 10, normalize = FALSE) {
+ksplines <- function(curves, k, df, order,
+                     lambda = 0.1,
+                     maxiter = 10,
+                     normalize = FALSE) {
+    
     all_x <- lapply(curves, "[[", "x")
     all_x <- do.call(c, all_x)
     basis_func <- get_basis(all_x, df, order)
