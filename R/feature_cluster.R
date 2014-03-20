@@ -19,10 +19,7 @@ feature_ksplines <- function(curves, k, df, order,
         curves[[ix]][["X"]] <- X
     }
 
-    fit_curves <- function(curves) {
-        X <- do.call(rbind, lapply(curves, "[[", "X"))
-        y <- do.call(c, lapply(curves, "[[", "y"))
-
+    solve_lsq <- function(X, y) {
         obj_fn <- function(coefs) {
             r2 <- (y - X %*% coefs)^2
             penalty <- as.numeric(coefs %*% Omega %*% coefs)
@@ -39,6 +36,30 @@ feature_ksplines <- function(curves, k, df, order,
 
         betas <- optim(rep(0, df), obj_fn, grad_fn, method = "BFGS")$par
         betas
+    }
+
+    fit_curves <- function(curves) {
+        X <- do.call(rbind, lapply(curves, "[[", "X"))
+        y <- do.call(c, lapply(curves, "[[", "y"))
+        solve_lsq(X, y)
+    }
+
+    fit_curves_norm <- function(curves) {
+        all_X <- lapply(curves, function(curve) {
+            n <- length(curve[["x"]])
+            W <- (1 / sqrt(n)) * diag(n)
+            W %*% curve[["X"]]
+        })
+        X <- do.call(rbind, all_X)
+
+        all_y <- lapply(curves, function(curve) {
+            n <- length(curve[["x"]])
+            W <- (1 / sqrt(n)) * diag(n)
+            as.numeric(W %*% curve[["y"]])
+        })
+        y <- do.call(c, all_y)
+
+        solve_lsq(X, y)
     }
 
     fit_codebook <- function(curves, cluster) {
