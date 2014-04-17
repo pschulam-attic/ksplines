@@ -1,5 +1,5 @@
 #' @export
-feature_ksplines <- function(curves, k, df, order,
+feature_ksplines <- function(curves, k, df, order, feature_fn,
                              lambda = 0.1,
                              maxiter = 10,
                              normalize = FALSE) {
@@ -105,3 +105,9 @@ feature_ksplines <- function(curves, k, df, order,
         codebook,
         basis_func)
 }
+
+### TODOS
+# 1. Update objective function to reflect feature funcs.
+# 2. Update gradient function to reflect feature funcs.
+# 3. Update class reassignment to reflect feature funcs.
+# 
