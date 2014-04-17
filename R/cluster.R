@@ -1,104 +1,74 @@
-#' Learn spline codebook for sparse curves
-#'
-#' @export
+curve_logl <- function(crv, cb) {
+  codebook_log_marginal(cb, crv[["X"]], crv[["y"]])
+}
+
+curve_map <- function(crv, cb) {
+  codebook_map(cb, crv[["X"]], crv[["y"]])
+}
+
+full_logl <- function(curves, cb) {
+  sum(vapply(curves, curve_logl, numeric(1), cb))
+}
+
+fit_codebook <- function(k, curves, clusters, algo) {
+  cb <- codebook(k)
+  res_sq <- 0
+  npoints <- 0
+  for (cx in seq(k)) {
+    subcurves <- curves[clusters == cx]
+    X <- do.call(rbind, lapply(subcurves, function(crv) {
+      X <- crv[["X"]]
+      X / sqrt(length(crv[["x"]]))
+    }))
+    y <- do.call(c, lapply(subcurves, function(crv) {
+      y <- crv[["y"]]
+      y / sqrt(length(crv[["x"]]))
+    }))
+    cb$probs[cx] <- length(subcurves)    
+    cb$coefs[[cx]] <- fit(algo, X, y)
+    res_sq <- res_sq + sum((y - X %*% cb$coefs[[cx]])^2)
+    npoints <- npoints + length(y)
+  }
+  cb$probs <- cb$probs / length(curves)
+  cb$sigma <- sqrt(res_sq / npoints)
+  cb
+}
+
+
+#' Fit a spline mixture to curves
 #' 
-ksplines <- function(curves, k, df, order,
-                     lambda = 0.1,
-                     maxiter = 10,
-                     normalize = FALSE) {
-    
-    all_x <- lapply(curves, "[[", "x")
-    all_x <- do.call(c, all_x)
-    basis_func <- get_basis(all_x, df, order)
+#' @export
+ksplines <- function(curves, k, df, order, lambda, xrange=NULL) {
+  if (is.null(xrange)) {
+    all_x <- do.call(c, lapply(curves, "[[", "x"))
+    xrange <- range(all_x)
+  }
+  
+  basis <- get_basis(xrange[1], xrange[2], df, order)
+  Omega <- lambda * get_smoothness_penalty(basis)
+  algo <- penleastsq(Omega)
+  for (ix in seq_along(curves)) {
+    curves[[ix]][["X"]] <- basis(curves[[ix]][["x"]])
+  }
 
-    Omega <- smoothness_penalty(attr(basis_func, "knots"),
-                                attr(basis_func, "bknots"),
-                                attr(basis_func, "order"))
-    Omega <- lambda * Omega
-    
-    for (ix in seq_along(curves)) {
-        x <- curves[[ix]][["x"]]
-        X <- basis_func(x)
-        curves[[ix]][["X"]] <- X
+  clusters <- sample(k, length(curves), replace=TRUE)
+  cb <- fit_codebook(k, curves, clusters, algo)
+  logl <- full_logl(curves, cb)
+  repeat {
+    old_logl <- logl
+    clusters <- vapply(curves, curve_map, numeric(1), cb)
+    cb <- fit_codebook(k, curves, clusters, algo)
+    logl <- full_logl(curves, cb)
+    if (logl - old_logl < 1e-2) {
+      break
     }
-    
-    fit_curves <- function(curves) {
-        X <- do.call(rbind, lapply(curves, "[[", "X"))
-        y <- do.call(c, lapply(curves, "[[", "y"))
-        solve(crossprod(X) + Omega, crossprod(X, y))
-    }
+  }
 
-    fit_curves_norm <- function(curves) {
-        all_X <- lapply(curves, function(curve) {
-            n <- length(curve[["x"]])
-            W <- (1 / sqrt(n)) * diag(n)
-            W %*% curve[["X"]]
-        })
-        X <- do.call(rbind, all_X)
-
-        all_y <- lapply(curves, function(curve) {
-            n <- length(curve[["x"]])
-            W <- (1 / sqrt(n)) * diag(n)
-            as.numeric(W %*% curve[["y"]])
-        })
-        y <- do.call(c, all_y)
-
-        solve(crossprod(X) + Omega, crossprod(X, y))
-    }
-
-    fit_codebook <- function(curves, cluster) {
-        codebook <- matrix(0, nrow = df, ncol = k)
-        
-        for (cx in seq(k)) {
-            subcurves <- curves[cluster == cx]
-            
-            if (length(subcurves) == 0) {
-                codebook[, cx] <- 0
-                next
-            }
-
-            if (normalize) {
-                codebook[, cx] <- fit_curves_norm(subcurves)
-            } else {
-                codebook[, cx] <- fit_curves(subcurves)
-            }
-        }
-
-        codebook
-    }
-
-    cluster <- sample(k, length(curves), replace = TRUE)
-    codebook <- fit_codebook(curves, cluster)
-
-    for (itx in seq(maxiter)) {
-        for (ix in seq_along(curves)) {
-            
-            X <- curves[[ix]][["X"]]
-            y <- curves[[ix]][["y"]]
-
-            Yhat <- X %*% codebook
-            r2 <- colSums((Yhat - y)^2)
-            cluster[ix] <- which.min(r2)
-        }
-
-        codebook <- fit_codebook(curves, cluster)
-    }
-
-    new_ksplines(
-        curves,
-        cluster,
-        codebook,
-        basis_func)
+  ksp <- structure(list(), class="ksplines")
+  ksp$k <- k
+  ksp$codebook <- cb
+  ksp$clusters <- clusters
+  ksp$basis <- basis
+  ksp$curves <- curves
+  ksp
 }
-
-#' Create new ksplines object
-#'
-new_ksplines <- function(curves, cluster, codebook, basis_func) {
-    obj <- structure(list(), class = "ksplines")
-    obj$curves <- curves
-    obj$cluster <- cluster
-    obj$codebook <- codebook
-    obj$basis_func <- basis_func
-    obj
-}
-
