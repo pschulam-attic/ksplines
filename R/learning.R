@@ -10,7 +10,7 @@ fit.leastsq <- function(lsq, X, y, w) {
   yw <- y * w
   A <- crossprod(Xw)
   b <- t(Xw) %*% yw
-  solve(A, b)
+  as.numeric(solve(A, b))
 }
 
 fit.penleastsq <- function(plsq, X, y, w) {
@@ -21,7 +21,7 @@ fit.penleastsq <- function(plsq, X, y, w) {
   yw <- y * w
   A <- crossprod(Xw) + plsq$Omega
   b <- t(Xw) %*% yw
-  solve(A, b)
+  as.numeric(solve(A, b))
 }
 
 leastsq <- function() {
