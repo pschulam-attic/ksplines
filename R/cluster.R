@@ -11,11 +11,16 @@ full_logl <- function(curves, cb) {
 }
 
 fit_codebook <- function(k, curves, clusters, algo) {
+  df <- ncol(curves[[1]][["X"]])
   cb <- codebook(k)
   res_sq <- 0
-  npoints <- 0
   for (cx in seq(k)) {
     subcurves <- curves[clusters == cx]
+    if (length(subcurves) == 0) {
+      cb$probs[cx] <- 0
+      cb$coefs[[cx]] <- numeric(df)
+      next
+    }
     X <- do.call(rbind, lapply(subcurves, function(crv) {
       X <- crv[["X"]]
       X / sqrt(length(crv[["x"]]))
@@ -27,10 +32,9 @@ fit_codebook <- function(k, curves, clusters, algo) {
     cb$probs[cx] <- length(subcurves)    
     cb$coefs[[cx]] <- fit(algo, X, y)
     res_sq <- res_sq + sum((y - X %*% cb$coefs[[cx]])^2)
-    npoints <- npoints + length(y)
   }
   cb$probs <- cb$probs / length(curves)
-  cb$sigma <- sqrt(res_sq / npoints)
+  cb$sigma <- sqrt(res_sq / length(curves))
   cb
 }
 
@@ -38,7 +42,7 @@ fit_codebook <- function(k, curves, clusters, algo) {
 #' Fit a spline mixture to curves
 #' 
 #' @export
-ksplines <- function(curves, k, df, order, lambda, xrange=NULL) {
+ksplines <- function(curves, k, df, order, lambda, xrange=NULL, verbose=FALSE) {
   if (is.null(xrange)) {
     all_x <- do.call(c, lapply(curves, "[[", "x"))
     xrange <- range(all_x)
@@ -54,11 +58,13 @@ ksplines <- function(curves, k, df, order, lambda, xrange=NULL) {
   clusters <- sample(k, length(curves), replace=TRUE)
   cb <- fit_codebook(k, curves, clusters, algo)
   logl <- full_logl(curves, cb)
+  if (verbose) message(sprintf("LL=%f", logl))
   repeat {
     old_logl <- logl
     clusters <- vapply(curves, curve_map, numeric(1), cb)
     cb <- fit_codebook(k, curves, clusters, algo)
     logl <- full_logl(curves, cb)
+    if (verbose) message(sprintf("LL=%f", logl))
     if (logl - old_logl < 1e-2) {
       break
     }
@@ -69,6 +75,7 @@ ksplines <- function(curves, k, df, order, lambda, xrange=NULL) {
   ksp$codebook <- cb
   ksp$clusters <- clusters
   ksp$basis <- basis
+  ksp$algo <- algo
   ksp$curves <- curves
   ksp$final_logl <- logl
   ksp
