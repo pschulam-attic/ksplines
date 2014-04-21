@@ -70,5 +70,6 @@ ksplines <- function(curves, k, df, order, lambda, xrange=NULL) {
   ksp$clusters <- clusters
   ksp$basis <- basis
   ksp$curves <- curves
+  ksp$final_logl <- logl
   ksp
 }
