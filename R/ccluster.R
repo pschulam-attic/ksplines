@@ -1,26 +1,89 @@
-#' Fit a featurized spline mixture to curves
+compute_slopes <- function(from, to, codebook, basis) {
+  Beta <- do.call(cbind, codebook$coefs)
+  x <- c(from, to)
+  X <- basis(x)
+  Y <- X %*% Beta
+  slopes <- (Y[2, ] - Y[1, ]) / (to - from)
+}
+
+compute_feat1 <- function(codebook, basis) {
+  compute_slopes(0, 5, codebook, basis)
+}
+
+compute_feat2 <- function(codebook, basis) {
+  compute_slopes(5, 10, codebook, basis)
+}
+
+compute_feat3 <- function(codebook, basis) {
+  compute_slopes(0, 15, codebook, basis)
+}
+
+compute_penalty <- function(curves, clusters, features, window) {
+  w <- window / 2
+  ncurves <- length(curves)
+  penalties <- lapply(seq(ncurves), function(cx) {
+    crv <- curves[[cx]]
+    crv_feats <- crv[["features"]]    
+    clust <- clusters[cx]
+    clust_feats <- features[, clust]
+    p <- abs(crv_feats - clust_feats) - w
+    p[p < 0] <- 0
+    sum(na.omit(p^2)) / length(na.omit(p))
+  })
+  sum(do.call(c, penalties)) / ncurves
+}
+
+#' Refine ksplines fit using feature constraints
 #'
 #' @export
-cksplines <- function(curves, k, df, order, lambda, xrange=NULL) {
-  if (is.null(xrange)) {
-    all_x <- do.call(c, lapply(curves, "[[", "x"))
-    xrange <- range(all_x)
-  }
-  
-  basis <- get_basis(xrange[1], xrange[2], df, order)
-  Omega <- lambda * get_smoothness_penalty(basis)
-  algo <- penleastsq(Omega)
-  for (ix in seq_along(curves)) {
-    curves[[ix]][["X"]] <- basis(curves[[ix]][["x"]])
-  }
-
-  ksp <- ksplines(curves, k, df, order, lambda, xrange)
-  clusters <- ksp$clusters
+cksplines <- function(ksp, window, temperatures, mc_len) {
+  algo <- ksp$algo
+  basis <- ksp$basis
   cb <- ksp$codebook
+  clusters <- ksp$clusters
+  curves <- ksp$curves
   logl <- ksp$final_logl
-  
+  k <- ksp$k
+  features <- rbind(compute_feat1(cb, basis),
+                    compute_feat2(cb, basis),
+                    compute_feat3(cb, basis))
+  penalty <- compute_penalty(curves, clusters, features, window)
+  energy <- -logl + penalty
+  energy <- -logl
 
   ## For each temperature
+  for (T in temperatures) {
+    message(sprintf("Temp=%f", T))
+    for (ix in seq(mc_len)) {
+      prop_clusters <- sample(k, length(curves), replace=TRUE)
+      prop_cb <- fit_codebook(k, curves, prop_clusters, algo)
+      prop_logl <- full_logl(curves, prop_cb)
+      prop_penalty <- compute_penalty(curves, clusters, features, window)
+      prop_energy <- -prop_logl + prop_penalty
+      prop_energy <- -prop_logl
+      if (prop_energy < energy) {
+        clusters <- prop_clusters
+        cb <- prop_cb
+        logl <- prop_logl
+        penalty <- prop_penalty
+        energy <- prop_energy
+      } else {
+        d <- prop_energy - energy
+        p <- exp(- d / T)
+        if (runif(1) < p) {
+          clusters <- prop_clusters
+          cb <- prop_cb
+          logl <- prop_logl
+          penalty <- prop_penalty
+          energy <- prop_energy
+        }
+      }
+    }
+    message(sprintf("LL=%f", logl))
+  }
 
-  ## Make some number of moves
+  ksp$cb <- cb
+  ksp$clusters <- clusters
+  ksp$final_logl <- logl
+  ksp
 }
