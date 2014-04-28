@@ -7,6 +7,12 @@ codebook <- function(k) {
   cb
 }
 
+rearrange_codebook <- function(cb, p) {
+  cb$probs <- cb$probs[p]
+  cb$coefs <- cb$coefs[p]
+  cb
+}
+
 #' @export
 plot.codebook <- function(cb, basis, from, to) {
   x <- seq(from, to, length=100)

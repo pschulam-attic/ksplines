@@ -1,5 +1,11 @@
 #' @export
-plot.ksplines <- function(ksp, include_means=TRUE) {
+plot.ksplines <- function(ksp) {
+  p <- plot_ksplines(ksp)
+  print(p)
+}
+
+#' @export
+plot_ksplines <- function(ksp, facet=TRUE) {
   curves <- ksp$curves
   ids <- vapply(curves, "[[", integer(1), "id")
   clusts <- data.frame(id=ids, cluster=ksp$clusters)
@@ -14,12 +20,13 @@ plot.ksplines <- function(ksp, include_means=TRUE) {
     y <- X %*% ksp$codebook$coefs[[cx]]
     data.frame(x=x, y=y, cluster=cx)
   })
-  means <- do.call(rbind, means)
+  means <- do.call(rbind, means[ksp$codebook$probs > 0])
 
   p <- ggplot() + theme_bw()
-  p <- p + geom_point(aes(x=x, y=y), alpha=0.25, data=data)
+  p <- p + geom_line(aes(x=x, y=y, group=id), alpha=0.25, data=data)
   p <- p + geom_line(aes(x=x, y=y), size=1.5, color="firebrick1", data=means)
-  p <- p + facet_wrap(~ cluster)
-  print(p)
+  if (facet) {
+    p <- p + facet_wrap(~ cluster)
+  }
+  p
 }
-

@@ -28,9 +28,24 @@ compute_penalty <- function(curves, clusters, features, window) {
     clust_feats <- features[, clust]
     p <- abs(crv_feats - clust_feats) - w
     p[p < 0] <- 0
-    sum(na.omit(p^2)) / length(na.omit(p))
+    sum(na.omit(p^2))
   })
-  sum(do.call(c, penalties)) / ncurves
+  sum(do.call(c, penalties))
+}
+
+fksplines <- function(ksp, window) {
+  algo <- ksp$algo
+  basis <- ksp$basis
+  cb <- ksp$codebook
+  clusters <- ksp$clusters
+  curves <- ksp$curves
+  logl <- ksp$final_logl
+  k <- ksp$k
+
+  ## Split move---look for cluster with best dimension-wise improvement.
+  for (cx in seq(k)) {
+    
+  }
 }
 
 #' Refine ksplines fit using feature constraints
@@ -49,24 +64,28 @@ cksplines <- function(ksp, window, temperatures, mc_len) {
                     compute_feat3(cb, basis))
   penalty <- compute_penalty(curves, clusters, features, window)
   energy <- -logl + penalty
-  energy <- -logl
 
   ## For each temperature
   for (T in temperatures) {
     message(sprintf("Temp=%f", T))
+    message(sprintf("LL=%f", logl))
+    message(sprintf("Penalty=%f", penalty))
+    message(sprintf("Energy=%f", energy))
+    naccepts <- 0
     for (ix in seq(mc_len)) {
       prop_clusters <- sample(k, length(curves), replace=TRUE)
       prop_cb <- fit_codebook(k, curves, prop_clusters, algo)
       prop_logl <- full_logl(curves, prop_cb)
-      prop_penalty <- compute_penalty(curves, clusters, features, window)
+      prop_penalty <- compute_penalty(curves, prop_clusters, features, window)
       prop_energy <- -prop_logl + prop_penalty
-      prop_energy <- -prop_logl
+      ## message(sprintf("Proposed=(%f)+(%f)=%f", -prop_logl, prop_penalty, prop_energy))
       if (prop_energy < energy) {
         clusters <- prop_clusters
         cb <- prop_cb
         logl <- prop_logl
         penalty <- prop_penalty
         energy <- prop_energy
+        naccepts <- naccepts + 1
       } else {
         d <- prop_energy - energy
         p <- exp(- d / T)
@@ -76,10 +95,11 @@ cksplines <- function(ksp, window, temperatures, mc_len) {
           logl <- prop_logl
           penalty <- prop_penalty
           energy <- prop_energy
+          naccepts <- naccepts + 1
         }
       }
     }
-    message(sprintf("LL=%f", logl))
+    message(sprintf("AcceptPerc=%f", naccepts / mc_len))
   }
 
   ksp$cb <- cb

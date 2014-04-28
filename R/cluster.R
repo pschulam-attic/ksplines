@@ -42,7 +42,9 @@ fit_codebook <- function(k, curves, clusters, algo) {
 #' Fit a spline mixture to curves
 #' 
 #' @export
-ksplines <- function(curves, k, df, order, lambda, xrange=NULL, verbose=FALSE) {
+ksplines <- function(curves, k, df, order, lambda,
+                     xrange=NULL, tol=1e-2, verbose=FALSE, decreasing=TRUE) {
+  
   if (is.null(xrange)) {
     all_x <- do.call(c, lapply(curves, "[[", "x"))
     xrange <- range(all_x)
@@ -65,10 +67,20 @@ ksplines <- function(curves, k, df, order, lambda, xrange=NULL, verbose=FALSE) {
     cb <- fit_codebook(k, curves, clusters, algo)
     logl <- full_logl(curves, cb)
     if (verbose) message(sprintf("LL=%f", logl))
-    if (logl - old_logl < 1e-2) {
+    if (logl - old_logl < tol) {
       break
     }
   }
+
+  ## Sort the clusters
+  X <- basis(xrange[1])
+  Beta <- do.call(cbind, cb$coefs)
+  start_vals <- as.numeric(X %*% Beta)
+  start_order <- order(start_vals, decreasing=decreasing)
+  idx <- seq(k)
+  idx[start_order] <- seq(k)
+  clusters <- idx[clusters]
+  cb <- rearrange_codebook(cb, start_order)
 
   ksp <- structure(list(), class="ksplines")
   ksp$k <- k
@@ -78,5 +90,15 @@ ksplines <- function(curves, k, df, order, lambda, xrange=NULL, verbose=FALSE) {
   ksp$algo <- algo
   ksp$curves <- curves
   ksp$final_logl <- logl
+  ksp
+}
+
+#' @export
+sksplines <- function(nsplits, window, ...) {
+  ksp <- ksplines(...)
+  max_k <- ksp$k + nsplits
+  while (ksp$k <= max_k) {
+    ksp <- split_step(ksp, window)
+  }
   ksp
 }
