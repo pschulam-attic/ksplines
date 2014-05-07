@@ -2,12 +2,13 @@
 num_feasible <- function(x, w, center=NULL) {
   x <- na.omit(x)
   if (is.null(center)) {
-    center <- mean(x)
+    center <- median(x)
   }
   feasible <- center - w / 2 <= x & x <= center + w / 2
   sum(feasible)
 }
 
+#' @import flexclust
 #' @export
 best_split <- function(curves, windows) {
   features <- do.call(rbind, lapply(curves, "[[", "features"))
@@ -23,13 +24,13 @@ best_split <- function(curves, windows) {
     nfeas <- num_feasible(f, window)
     x <- f
     x[is.na(x)] <- mean(x, na.rm=TRUE)
-    kmfit <- kmeans(x, 2)
-    f1 <- f[kmfit$cluster == 1]
-    f2 <- f[kmfit$cluster == 2]
+    kmfit <- kcca(x, 2, family = kccaFamily("kmedians"))
+    f1 <- f[kmfit@cluster == 1]
+    f2 <- f[kmfit@cluster == 2]
     split_nfeas <- num_feasible(f1, window) + num_feasible(f2, window)
     if (split_nfeas - nfeas > gain) {
       gain <- split_nfeas - nfeas
-      clusters <- kmfit$cluster
+      clusters <- kmfit@cluster
     }
   }
   list(gain=gain, clusters=clusters)
