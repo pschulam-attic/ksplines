@@ -3,13 +3,55 @@ codebook <- function(k) {
   cb$k <- k
   cb$probs <- rep(1, k) / k
   cb$coefs <- vector("list", k)
-  cb$sigma <- 1
+  cb$sigma <- rep(1, k)
   cb
 }
 
 rearrange_codebook <- function(cb, p) {
   cb$probs <- cb$probs[p]
   cb$coefs <- cb$coefs[p]
+  cb
+}
+
+codebook_reorder <- function(cb, perm) {
+  cb$probs <- cb$probs[perm]
+  cb$coefs <- cb$coefs[perm]
+  cb
+}
+
+codebook_split <- function(cb, cx) {
+  cb$k <- cb$k + 1
+  cb$probs[cb$k] <- cb$probs[cx] / 2
+  cb$probs[cx] <- cb$probs[cb$k]
+  cb$coefs[[cb$k]] <- cb$coefs[[cx]]
+  cb
+}
+
+codebook_merge <- function(cb, cx1, cx2) {
+  cx <- min(cx1, cx2)
+  cb$k <- cb$k - 1
+  cb$probs[cx] <- sum(cb$probs[c(cx1, cx2)])
+  cb$probs <- cb$probs[-max(cx1, cx2)]
+  cb$coefs[[cx]] <- 0.5 * cb$coefs[[cx1]] + 0.5 * cb$coefs[[cx2]]
+  cb$coefs <- cb$coefs[-max(cx1, cx2)]
+  cb
+}
+
+codebook_multi_merge <- function(cb, cxs) {
+  stopifnot(length(cxs) > 1)
+  cx <- min(cxs)
+  others <- cxs[-which.min(cxs)]
+  cb$k <- cb$k - length(cxs) + 1
+  cb$probs[cx] <- sum(cb$probs[cxs])
+  cb$probs <- cb$probs[-others]
+
+  v <- numeric(length(cb$coefs[[cx]]))
+  for (ix in cxs) {
+    v <- v + (1 / length(cxs)) * cb$coefs[[ix]]
+  }
+  cb$coefs[[cx]] <- v
+  cb$coefs <- cb$coefs[-others]
+
   cb
 }
 
@@ -31,7 +73,7 @@ codebook_posterior <- function(cb, X, y) {
   Coefs <- do.call(cbind, cb$coefs)
   Yhat <- X %*% Coefs
   res <- y - Yhat
-  logl <- colSums(dnorm(res, sd=cb$sigma, log=TRUE))
+  logl <- rowSums(dnorm(t(res), sd=cb$sigma, log=TRUE))
   logjoint <- logl + log(cb$probs)
   logpost <- logjoint - logsumexp(logjoint)
   exp(logpost)
@@ -46,7 +88,7 @@ codebook_log_marginal <- function(cb, X, y) {
   Coefs <- do.call(cbind, cb$coefs)
   Yhat <- X %*% Coefs
   res <- y - Yhat
-  logl <- colSums(dnorm(res, sd=cb$sigma, log=TRUE))
+  logl <- rowSums(dnorm(t(res), sd=cb$sigma, log=TRUE))
   logjoint <- logl + log(cb$probs)
   logsumexp(logjoint)
 }

@@ -24,9 +24,19 @@ plot_ksplines <- function(ksp, facet=TRUE) {
 
   p <- ggplot() + theme_bw()
   p <- p + geom_line(aes(x=x, y=y, group=id), alpha=0.25, data=data)
-  p <- p + geom_line(aes(x=x, y=y), size=1.5, color="firebrick1", data=means)
+  p <- p + geom_line(aes(x=x, y=y), alpha = 0.25, size=1, color="firebrick1", data=means)
   if (facet) {
     p <- p + facet_wrap(~ cluster)
   }
+  p
+}
+
+#' @export
+plot_curves <- function(curves) {
+  data <- ldply(curves, function(crv) {
+    data.frame(ptid=crv$id, x=crv$x, y=crv$y)
+  })
+  p <- ggplot(data) + theme_bw()
+  p <- p + geom_line(aes(x=x, y=y, group=ptid), alpha=0.5)
   p
 }
