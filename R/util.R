@@ -40,3 +40,17 @@ estimate_features <- function(curve) {
   curve[["features"]] <- features
   curve
 }
+
+bootstrap_coefficients <- function(curves, algo, B) {
+  boot_coefs <- matrix(0, nrow = ncol(curves[[1]]$X), ncol = B)
+  n <- length(curves)
+  
+  for (bx in seq(B)) {
+    curve_sample <- sample(curves, n, replace = TRUE)
+    X <- get_X(curve_sample)
+    y <- get_y(curve_sample)
+    boot_coefs[, bx] <- fit(algo, X, y)
+  }
+  
+  boot_coefs
+}

@@ -71,25 +71,25 @@ score_merge <- function(merge, ksp, windows) {
   feats1 <- do.call(rbind, lapply(sub1, "[[", "features"))
   feats2 <- do.call(rbind, lapply(sub2, "[[", "features"))
   
-  nfeasible1 <- nfeasible2 <- 0
+  nfeasible1 <- nfeasible2 <- numeric(length(windows))
   for (cx in seq(along = windows)) {
-    nfeasible1 <- nfeasible1 + num_feasible(feats1[, cx], windows[cx])
-    nfeasible2 <- nfeasible2 + num_feasible(feats2[, cx], windows[cx])
+    nfeasible1[cx] <- num_feasible(feats1[, cx], windows[cx])
+    nfeasible2[cx] <- num_feasible(feats2[, cx], windows[cx])
   }
   
   feats <- rbind(feats1, feats2)
-  nfeasible <- 0
+  nfeasible <- numeric(length(windows))
   for (cx in seq(along = windows)) {
-    nfeasible <- nfeasible + num_feasible(feats[, cx], windows[cx])
+    nfeasible[cx] <- num_feasible(feats[, cx], windows[cx])
   }
   
   no_worse <- nfeasible - (nfeasible1 + nfeasible2) >= 0
-  if (!no_worse) {
-    list(logl_diff = -Inf, no_worse = no_worse)
+  if (!all(no_worse)) {
+    list(logl_diff = -Inf, no_worse = FALSE)
   } else {
     ksp_merged <- ksplines_merge(ksp, cx1, cx2)
     logl_diff <- ksp_merged$final_logl - ksp$final_logl
-    list(logl_diff = logl_diff, no_worse = no_worse)
+    list(logl_diff = logl_diff, no_worse = TRUE)
   }
 }
 
@@ -104,7 +104,7 @@ merge_step <- function(ksp, windows) {
   if (!any(no_worse & logl_diff > 0)) {
     ksp
   } else {
-    merges <- merges[, no_worse]
+    merges <- merges[, no_worse, drop = FALSE]
     logl_diff <- logl_diff[no_worse]
     best_merge <- merges[, which.max(logl_diff)]
     ksplines_merge(ksp, best_merge[1], best_merge[2])

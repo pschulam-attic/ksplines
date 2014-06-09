@@ -1,13 +1,21 @@
-curve_logl <- function(crv, cb) {
-  codebook_log_marginal(cb, crv[["X"]], crv[["y"]])
+curve_logl <- function(crv, cb, cx) {
+  #codebook_log_marginal(cb, crv[["X"]], crv[["y"]])
+  X <- crv[["X"]]
+  y <- crv[["y"]]
+  beta <- cb$coefs[[cx]]
+  sigma <- cb$sigma[cx]
+  logls <- dnorm(y, mean = X %*% beta, sd = sigma, log = TRUE)
+  sum(logls)
 }
 
 curve_map <- function(crv, cb) {
   codebook_map(cb, crv[["X"]], crv[["y"]])
 }
 
-full_logl <- function(curves, cb) {
-  sum(vapply(curves, curve_logl, numeric(1), cb))
+full_logl <- function(curves, cb, clusters) {
+  n <- length(curves)
+  logls <- vapply(seq(n), function(ix) curve_logl(curves[[ix]], cb, clusters[ix]), numeric(1))
+  sum(logls)
 }
 
 get_X <- function(curves) {
@@ -81,8 +89,10 @@ fit_codebook <- function(k, curves, clusters, algo, one_sd=FALSE) {
 #' @export
 ksplines <- function(curves, k, df, order, lambda,
                      xrange=NULL, tol=1e-2, verbose=FALSE, seed = 1) {
-  
-  set.seed(1)
+
+  if (!is.null(seed)) {
+    set.seed(seed)
+  }
   
   if (is.null(xrange)) {
     all_x <- do.call(c, lapply(curves, "[[", "x"))
@@ -98,13 +108,13 @@ ksplines <- function(curves, k, df, order, lambda,
 
   clusters <- sample(k, length(curves), replace=TRUE)
   cb <- fit_codebook(k, curves, clusters, algo, one_sd = TRUE)
-  logl <- full_logl(curves, cb)
+  logl <- full_logl(curves, cb, clusters)
   if (verbose) message(sprintf("LL=%f", logl))
   repeat {
     old_logl <- logl
     clusters <- vapply(curves, curve_map, numeric(1), cb)
     cb <- fit_codebook(k, curves, clusters, algo)
-    logl <- full_logl(curves, cb)
+    logl <- full_logl(curves, cb, clusters)
     if (verbose) message(sprintf("LL=%f", logl))
     if (logl - old_logl < tol) {
       break
@@ -188,7 +198,7 @@ ksplines_split <- function(ksp, cx, c1, c2) {
   ksp$codebook$probs[ksp$k] <- length(c2) / length(ksp$curves)
   
   ksp$codebook$sigma <- fit_sigma(ksp$curves, ksp$clusters, ksp$codebook)
-  ksp$final_logl <- full_logl(ksp$curves, ksp$codebook)
+  ksp$final_logl <- full_logl(ksp$curves, ksp$codebook, ksp$clusters)
 
   ksp
 }
@@ -208,7 +218,7 @@ ksplines_merge <- function(ksp, cx1, cx2) {
   ksp$codebook$coefs[[cx]] <- fit(ksp$algo, X, y)
   
   ksp$codebook$sigma <- fit_sigma(ksp$curves, ksp$clusters, ksp$codebook)
-  ksp$final_logl <- full_logl(ksp$curves, ksp$codebook)
+  ksp$final_logl <- full_logl(ksp$curves, ksp$codebook, ksp$clusters)
 
   nmerges <- length(ksp$merges)
   ksp$merges[[nmerges + 1]] <- merge_move

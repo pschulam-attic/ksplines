@@ -84,11 +84,16 @@ codebook_map <- function(cb, X, y) {
   which.max(posts)
 }
 
-codebook_log_marginal <- function(cb, X, y) {
+codebook_log_marginal <- function(cb, X, y, map = FALSE) {
   Coefs <- do.call(cbind, cb$coefs)
   Yhat <- X %*% Coefs
   res <- y - Yhat
   logl <- rowSums(dnorm(t(res), sd=cb$sigma, log=TRUE))
-  logjoint <- logl + log(cb$probs)
-  logsumexp(logjoint)
+
+  if (map) {
+    logl[codebook_map(cb, X, y)]
+  } else {
+    logjoint <- logl + log(cb$probs)
+    logsumexp(logjoint)
+  }
 }
